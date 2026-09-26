@@ -103,6 +103,15 @@ func (h *SystemHandler) Audits(c *gin.Context) {
 	util.Page(c, logs, query.Page, query.PageSize, total)
 }
 
+func (h *SystemHandler) AuditChain(c *gin.Context) {
+	report, err := h.security.AuditChain(c.Request.Context())
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	util.OK(c, report)
+}
+
 func (h *SystemHandler) Session(c *gin.Context) {
 	displayName, _ := c.Get("displayName")
 	util.OK(c, dto.SessionResponse{

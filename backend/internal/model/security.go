@@ -14,16 +14,19 @@ type User struct {
 }
 
 type AuditLog struct {
-	ID          uint      `json:"id" gorm:"primaryKey"`
-	RequestID   string    `json:"requestId" gorm:"size:64;index"`
-	Actor       string    `json:"actor" gorm:"size:80;index"`
-	Action      string    `json:"action" gorm:"size:80;index"`
-	EntityType  string    `json:"entityType" gorm:"size:80;index"`
-	EntityID    uint      `json:"entityId" gorm:"index"`
-	BeforeState string    `json:"beforeState" gorm:"size:40"`
-	AfterState  string    `json:"afterState" gorm:"size:40"`
-	Detail      string    `json:"detail" gorm:"size:2000"`
-	CreatedAt   time.Time `json:"createdAt" gorm:"index"`
+	ID              uint      `json:"id" gorm:"primaryKey"`
+	Seq             *uint     `json:"seq" gorm:"uniqueIndex;index"`
+	PrevFingerprint string    `json:"prevFingerprint" gorm:"size:64;index"`
+	Fingerprint     string    `json:"fingerprint" gorm:"size:64;index"`
+	RequestID       string    `json:"requestId" gorm:"size:64;index"`
+	Actor           string    `json:"actor" gorm:"size:80;index"`
+	Action          string    `json:"action" gorm:"size:80;index"`
+	EntityType      string    `json:"entityType" gorm:"size:80;index"`
+	EntityID        uint      `json:"entityId" gorm:"index"`
+	BeforeState     string    `json:"beforeState" gorm:"size:40"`
+	AfterState      string    `json:"afterState" gorm:"size:40"`
+	Detail          string    `json:"detail" gorm:"size:2000"`
+	CreatedAt       time.Time `json:"createdAt" gorm:"index;autoCreateTime:false"`
 }
 
 type AuditActionCount struct {

@@ -17,6 +17,7 @@ type SecurityService interface {
 	Login(context.Context, dto.LoginRequest) (dto.LoginResponse, error)
 	Audit(context.Context, string, string, string, string, uint, string, string, string) error
 	ListAudits(context.Context, int, int, string) ([]model.AuditLog, int64, error)
+	AuditChain(context.Context) (model.AuditChainReport, error)
 	AuditSummary(context.Context, time.Duration) (model.AuditSummary, error)
 	EntityHistory(context.Context, string, uint, int) ([]model.AuditLog, error)
 	RuntimeConfig() config.PublicConfig
@@ -65,7 +66,7 @@ func (s *securityService) Audit(ctx context.Context, actor, requestID, action, e
 	if action == "" || entityType == "" {
 		return fmt.Errorf("audit action and entity type are required")
 	}
-	return s.repository.AppendAudit(ctx, &model.AuditLog{
+	return s.repository.AppendChainedAudit(ctx, &model.AuditLog{
 		Actor: actor, RequestID: requestID, Action: action, EntityType: entityType,
 		EntityID: entityID, BeforeState: before, AfterState: after, Detail: detail,
 		CreatedAt: time.Now().UTC(),

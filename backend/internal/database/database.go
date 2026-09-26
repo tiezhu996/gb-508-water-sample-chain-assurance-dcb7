@@ -8,6 +8,7 @@ import (
 
 	"github.com/blueship581/water-sample-chain-assurance/backend/internal/config"
 	"github.com/blueship581/water-sample-chain-assurance/backend/internal/model"
+	"github.com/blueship581/water-sample-chain-assurance/backend/internal/repository"
 	"github.com/glebarez/sqlite"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
@@ -75,13 +76,18 @@ func Open(ctx context.Context, cfg config.Config, log *slog.Logger) (*gorm.DB, *
 }
 
 func migrate(db *gorm.DB) error {
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.User{}, &model.AuditLog{},
 		&model.SamplingBatch{},
 		&model.LabSample{},
 		&model.AssayMethod{},
 		&model.ResultReview{},
-	)
+	); err != nil {
+		return err
+	}
+	// Seal audit rows written before the fingerprint chain existed so new
+	// records can continue from a consistent tip. Runs before seeding.
+	return repository.NewSecurityRepository(db).BackfillAuditChain(context.Background())
 }
 
 func Seed(ctx context.Context, db *gorm.DB) error {
