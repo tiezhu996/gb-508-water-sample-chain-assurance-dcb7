@@ -16,7 +16,8 @@ import (
 type SecurityService interface {
 	Login(context.Context, dto.LoginRequest) (dto.LoginResponse, error)
 	Audit(context.Context, string, string, string, string, uint, string, string, string) error
-	ListAudits(context.Context, int, int, string) ([]model.AuditLog, int64, error)
+	ListAudits(context.Context, int, int, string) ([]dto.AuditChainEntry, int64, error)
+	AuditChainStatus(context.Context) (model.AuditChainStatus, error)
 	AuditSummary(context.Context, time.Duration) (model.AuditSummary, error)
 	EntityHistory(context.Context, string, uint, int) ([]model.AuditLog, error)
 	RuntimeConfig() config.PublicConfig
@@ -65,15 +66,41 @@ func (s *securityService) Audit(ctx context.Context, actor, requestID, action, e
 	if action == "" || entityType == "" {
 		return fmt.Errorf("audit action and entity type are required")
 	}
-	return s.repository.AppendAudit(ctx, &model.AuditLog{
+	return s.repository.AppendAuditChain(ctx, &model.AuditLog{
 		Actor: actor, RequestID: requestID, Action: action, EntityType: entityType,
 		EntityID: entityID, BeforeState: before, AfterState: after, Detail: detail,
 		CreatedAt: time.Now().UTC(),
 	})
 }
 
-func (s *securityService) ListAudits(ctx context.Context, page, pageSize int, search string) ([]model.AuditLog, int64, error) {
-	return s.repository.ListAudits(ctx, page, pageSize, search)
+func (s *securityService) ListAudits(ctx context.Context, page, pageSize int, search string) ([]dto.AuditChainEntry, int64, error) {
+	logs, total, err := s.repository.ListAudits(ctx, page, pageSize, search)
+	if err != nil {
+		return nil, 0, err
+	}
+	status, err := s.AuditChainStatus(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	issues := make(map[uint64]string, len(status.Issues))
+	for _, issue := range status.Issues {
+		if _, exists := issues[issue.Seq]; !exists && issue.Kind != model.AuditChainIssueMissing && issue.Kind != model.AuditChainIssueAnchor {
+			issues[issue.Seq] = issue.Kind
+		}
+	}
+	entries := make([]dto.AuditChainEntry, 0, len(logs))
+	for _, log := range logs {
+		entry := dto.AuditChainEntry{AuditLog: log, ChainOK: true}
+		if log.Seq == nil {
+			entry.ChainOK = false
+			entry.Issue = model.AuditChainIssueUnchained
+		} else if kind, broken := issues[*log.Seq]; broken {
+			entry.ChainOK = false
+			entry.Issue = kind
+		}
+		entries = append(entries, entry)
+	}
+	return entries, total, nil
 }
 
 func (s *securityService) AuditSummary(ctx context.Context, window time.Duration) (model.AuditSummary, error) {

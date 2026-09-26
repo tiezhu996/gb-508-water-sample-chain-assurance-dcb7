@@ -12,10 +12,13 @@ type SecurityRepository interface {
 	FindUserByUsername(context.Context, string) (model.User, error)
 	CreateUser(context.Context, *model.User) error
 	CountUsers(context.Context) (int64, error)
-	AppendAudit(context.Context, *model.AuditLog) error
 	ListAudits(context.Context, int, int, string) ([]model.AuditLog, int64, error)
 	SummarizeAudits(context.Context, time.Time) (model.AuditSummary, error)
 	EntityHistory(context.Context, string, uint, int) ([]model.AuditLog, error)
+	AppendAuditChain(context.Context, *model.AuditLog) error
+	ListAuditsInChainOrder(context.Context) ([]model.AuditLog, error)
+	GetAuditChainAnchor(context.Context) (model.AuditChainAnchor, error)
+	EnsureAuditChain(context.Context) error
 }
 
 type securityRepository struct{ db *gorm.DB }
@@ -39,10 +42,6 @@ func (r *securityRepository) CountUsers(ctx context.Context) (int64, error) {
 	return total, r.db.WithContext(ctx).Model(&model.User{}).Count(&total).Error
 }
 
-func (r *securityRepository) AppendAudit(ctx context.Context, log *model.AuditLog) error {
-	return r.db.WithContext(ctx).Create(log).Error
-}
-
 func (r *securityRepository) ListAudits(ctx context.Context, page, pageSize int, search string) ([]model.AuditLog, int64, error) {
 	page, pageSize = normalizePage(page, pageSize)
 	db := r.db.WithContext(ctx).Model(&model.AuditLog{})
@@ -55,7 +54,7 @@ func (r *securityRepository) ListAudits(ctx context.Context, page, pageSize int,
 		return nil, 0, err
 	}
 	logs := make([]model.AuditLog, 0)
-	err := db.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&logs).Error
+	err := db.Order("created_at DESC, id DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&logs).Error
 	return logs, total, err
 }
 

@@ -50,6 +50,7 @@ func New(cfg config.Config, db *gorm.DB, redisClient *redis.Client, logger *slog
 	api.Use(limiter.Middleware(), middleware.Authenticate(cfg))
 	api.GET("/overview", systemHandler.Overview)
 	api.GET("/audits", middleware.RequireMinimumRole("reviewer"), systemHandler.Audits)
+	api.GET("/audit-chain", middleware.RequireMinimumRole("reviewer"), systemHandler.AuditChain)
 	api.GET("/session", systemHandler.Session)
 	api.GET("/runtime", middleware.RequireMinimumRole("reviewer"), systemHandler.Runtime)
 	api.GET("/audit-summary", middleware.RequireMinimumRole("reviewer"), systemHandler.AuditSummary)

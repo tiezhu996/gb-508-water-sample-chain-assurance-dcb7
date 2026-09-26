@@ -8,6 +8,7 @@ import (
 
 	"github.com/blueship581/water-sample-chain-assurance/backend/internal/config"
 	"github.com/blueship581/water-sample-chain-assurance/backend/internal/model"
+	"github.com/blueship581/water-sample-chain-assurance/backend/internal/repository"
 	"github.com/glebarez/sqlite"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
@@ -64,6 +65,10 @@ func Open(ctx context.Context, cfg config.Config, log *slog.Logger) (*gorm.DB, *
 	if err := Seed(ctx, db); err != nil {
 		return nil, nil, err
 	}
+	// 为历史审计记录回填指纹链，并初始化链尾锚点；幂等，重启安全。
+	if err := repository.NewSecurityRepository(db).EnsureAuditChain(ctx); err != nil {
+		return nil, nil, fmt.Errorf("ensure audit fingerprint chain: %w", err)
+	}
 	var redisClient *redis.Client
 	if cfg.RedisAddr != "" {
 		redisClient = redis.NewClient(&redis.Options{Addr: cfg.RedisAddr, Password: cfg.RedisPassword})
@@ -76,7 +81,7 @@ func Open(ctx context.Context, cfg config.Config, log *slog.Logger) (*gorm.DB, *
 
 func migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
-		&model.User{}, &model.AuditLog{},
+		&model.User{}, &model.AuditLog{}, &model.AuditChainAnchor{},
 		&model.SamplingBatch{},
 		&model.LabSample{},
 		&model.AssayMethod{},
